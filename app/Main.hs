@@ -2,6 +2,7 @@ module Main (main) where
 
 import LispReader.LispReader (read, makeStringInputStream)
 
+import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.State.Strict (runState)
 import Data.List (elemIndices)
 import Prelude hiding (read)
@@ -23,9 +24,14 @@ readProgram = readProgram' ""
 repLoop :: IO ()
 repLoop = do
     src <- readProgram
-    let (str, _) = runState read (makeStringInputStream src)
-    putStrLn str
-    repLoop
+    case fst $ runState (runExceptT read) (makeStringInputStream src) of
+        Right str ->
+            putStrLn ("SUCCESS " ++ str) >>
+                repLoop
+
+        Left err ->
+            putStrLn ("FAILURE " ++ err) >>
+                repLoop
 
 main :: IO ()
 main = do

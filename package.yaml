@@ -21,6 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - transformers >= 0.6.1 && < 0.6.2
+- regex-posix >= 0.96 && < 0.97
 
 ghc-options:
 - -Wall
