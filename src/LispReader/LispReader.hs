@@ -1,8 +1,11 @@
 module LispReader.LispReader (read, makeStringInputStream) where
 
+import Util (guaranteeM)
+
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT)
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.State.Strict (StateT, get, put)
+import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity)
 import Prelude hiding (read)
 import Text.Regex.Posix ((=~))
@@ -67,7 +70,73 @@ readChar = do
     _        <- lift $ put (str, i + 1)
     return (str !! i)
 
+unreadChar :: ExceptT String (StateT InputStream Identity) ()
+unreadChar = do
+    (str, i) <- lift get
+    lift $ put (str, i - 1)
+
+isEOF :: ExceptT String (StateT InputStream Identity) Bool
+isEOF = do
+    (str, i) <- lift get
+    return (i >= length str)
+
 read :: ExceptT String (StateT InputStream Identity) String
 read = do
-    char <- readChar
-    return (char : show (categoriseType char))
+    _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+    x <- readChar
+    case categoriseType x of
+        Invalid                 -> throwE "READ-ERROR invalid"
+        Whitespace              -> read
+        TerminatingMacroChar    -> return "function call: read macro"
+        NonTerminatingMacroChar -> return "function call: read macro"
+        SingleEscape            -> do
+            _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+            y <- readChar
+            return ("value: escaped " ++ [y])
+        MultipleEscape          -> do
+            token <- escapedTokenRead ""
+            return ("value: escaped " ++ token)
+        Constituent             -> do
+            token <- tokenRead [x]
+            return ("value: token " ++ token)
+    where
+        escapedTokenRead :: String -> ExceptT String (StateT InputStream Identity) String
+        escapedTokenRead token = do
+            _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+            y <- readChar
+            case categoriseType y of
+                Constituent             -> escapedTokenRead (token ++ [y])
+                NonTerminatingMacroChar -> escapedTokenRead (token ++ [y])
+                TerminatingMacroChar    -> escapedTokenRead (token ++ [y])
+                Whitespace              -> escapedTokenRead (token ++ [y])
+                SingleEscape            -> do
+                    _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+                    z <- readChar
+                    escapedTokenRead (token ++ [z])
+                MultipleEscape          -> tokenRead token
+                Invalid                 -> throwE "READ-ERROR invalid"
+
+
+        tokenRead :: String -> ExceptT String (StateT InputStream Identity) String
+        tokenRead token = do
+            eof <- isEOF
+            if eof then
+                return token
+
+            else do
+                y <- readChar
+                case categoriseType y of
+                    Constituent             -> tokenRead (token ++ [y])
+                    NonTerminatingMacroChar -> tokenRead (token ++ [y])
+                    SingleEscape            -> do
+                        _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+                        z <- readChar
+                        tokenRead (token ++ [z])
+                    MultipleEscape          -> escapedTokenRead token
+                    Invalid                 -> throwE "READ-ERROR invalid"
+                    TerminatingMacroChar    -> do
+                        _ <- unreadChar
+                        return token
+                    Whitespace              -> do
+                        _ <- unreadChar -- the reference says that unread it if appropriate
+                        return token
