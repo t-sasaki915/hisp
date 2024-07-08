@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       Lib
+      LispReader.StandardChars
   other-modules:
       Paths_hisp
   hs-source-dirs:
