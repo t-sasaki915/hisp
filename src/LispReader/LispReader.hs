@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module LispReader.LispReader (read, makeStringInputStream) where
 
 import Util (guaranteeM)
@@ -87,8 +89,8 @@ read = do
     case categoriseType x of
         Invalid                 -> throwE "READ-ERROR invalid"
         Whitespace              -> read
-        TerminatingMacroChar    -> return "function call: read macro"
-        NonTerminatingMacroChar -> return "function call: read macro"
+        TerminatingMacroChar    -> readMacro x
+        NonTerminatingMacroChar -> readMacro x
         SingleEscape            -> do
             _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
             y <- readChar
@@ -140,3 +142,48 @@ read = do
                     Whitespace              -> do
                         _ <- unreadChar -- the reference says that unread it if appropriate
                         return token
+
+readMacro :: Char -> ExceptT String (StateT InputStream Identity) String
+readMacro = \case
+    '('  -> listReading []
+    ')'  -> throwE "READ-ERROR unexpected ')'"
+    '\'' -> quoting
+    ';'  -> ignoring
+    '"'  -> stringReading ""
+    '`'  -> throwE "READ-ERROR no implementation for '`'"
+    ','  -> throwE "READ-ERROR unexpected ','"
+    '#'  -> throwE "READ-ERROR no implementation for '#'"
+    _    -> throwE "" -- unreachable
+
+listReading :: [String] -> ExceptT String (StateT InputStream Identity) String
+listReading exprs = do
+    _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+    x <- readChar
+    case x of
+        ')' -> return (show exprs)
+        _   -> do
+            expr <- read
+            listReading (exprs ++ [expr])
+ 
+quoting :: ExceptT String (StateT InputStream Identity) String
+quoting = do
+    _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+    expr <- read
+    return ("quoted " ++ expr)
+
+ignoring :: ExceptT String (StateT InputStream Identity) String
+ignoring = do
+    _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+    x <- readChar
+    case x of
+        '\n' -> read
+        _    -> ignoring
+
+stringReading :: String -> ExceptT String (StateT InputStream Identity) String
+stringReading buffer = do
+    _ <- guaranteeM (isEOF <&> not) "READ-ERROR end of file"
+    x <- readChar
+    case x of
+        '"'  -> return ("string " ++ buffer)
+        '\\' -> stringReading buffer
+        _    -> stringReading (buffer ++ [x])
