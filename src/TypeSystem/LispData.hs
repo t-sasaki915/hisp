@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module TypeSystem.LispData (LispData(..), internalTypeOf) where
 
 import TypeSystem.LispType (LispType(..))
@@ -12,6 +10,7 @@ data LispData = NIL
               | INTEGER Integer
               | END_OF_FILE
               | READER_ERROR String
+              | LIST [LispData]
               deriving (Eq, Show)
 
 internalTypeOf :: LispData -> LispType
@@ -22,3 +21,4 @@ internalTypeOf = \case
     (INTEGER _)       -> INTEGER'
     END_OF_FILE       -> END_OF_FILE'
     (READER_ERROR _)  -> READER_ERROR'
+    (LIST _)          -> LIST'

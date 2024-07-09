@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module TypeSystem.LispType (LispType(..), precedences, fromTypeSpecifier, internalTypep) where
 
 data LispType = NIL'

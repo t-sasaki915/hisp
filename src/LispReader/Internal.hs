@@ -1,9 +1,8 @@
-{-# LANGUAGE LambdaCase #-}
-
-module LispReader.Internal (internalRead) where
+module LispReader.Internal (internalRead, internalReadPreservingWhitespace) where
 
 import TypeSystem.LispData (LispData(..))
 
+import Control.Monad (when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Data.ByteString (ByteString, head, pack)
@@ -68,7 +67,15 @@ unreadChar c = unRead (pack [c2w c])
 
 internalRead :: InputStream ByteString -> Bool -> LispData -> Bool ->
                 ExceptT LispData IO LispData
-internalRead inputStream eofErrorP eofValue recursiveP = do
+internalRead a b c d = internalRead' a b c d False
+
+internalReadPreservingWhitespace :: InputStream ByteString -> Bool -> LispData ->
+                                    Bool -> ExceptT LispData IO LispData
+internalReadPreservingWhitespace a b c d = internalRead' a b c d True
+
+internalRead' :: InputStream ByteString -> Bool -> LispData -> Bool -> Bool ->
+                 ExceptT LispData IO LispData
+internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
     lift (atEOF inputStream) >>= \case
         True | eofErrorP -> throwE END_OF_FILE
         True             -> return eofValue
@@ -79,7 +86,7 @@ internalRead inputStream eofErrorP eofValue recursiveP = do
                     throwE (READER_ERROR "Invalid Character")
 
                 Whitespace ->
-                    internalRead inputStream eofErrorP eofValue recursiveP
+                    internalRead' inputStream eofErrorP eofValue recursiveP preserve
 
                 TerminatingMacroChar ->
                     assignMacroAnalyser x
@@ -102,7 +109,7 @@ internalRead inputStream eofErrorP eofValue recursiveP = do
     where
         assignMacroAnalyser :: Char -> ExceptT LispData IO LispData
         assignMacroAnalyser = \case
-            '('  -> return (SIMPLE_STRING "LIST")
+            '('  -> listAnalyse []
             ')'  -> throwE (READER_ERROR "UNEXPECTED ')'")
             '\'' -> return (SIMPLE_STRING "QUOTE")
             ';'  -> return (SIMPLE_STRING "COMMENT")
@@ -131,7 +138,7 @@ internalRead inputStream eofErrorP eofValue recursiveP = do
                                     multipleEscapeAnalyse (token ++ [z])
                         MultipleEscape          -> tokenAnalyse token
                         Invalid                 -> throwE (READER_ERROR "Invalid Character")
-    
+
         tokenAnalyse :: String -> ExceptT LispData IO LispData
         tokenAnalyse token =
             lift (atEOF inputStream) >>= \case
@@ -153,4 +160,18 @@ internalRead inputStream eofErrorP eofValue recursiveP = do
                             _ <- lift $ unreadChar y inputStream
                             return (SIMPLE_STRING ("VALUE: " ++ token))
                         Whitespace              -> do
+                            _ <- lift $ when preserve (unreadChar y inputStream)
                             return (SIMPLE_STRING ("VALUE: " ++ token))
+        
+        listAnalyse :: [LispData] -> ExceptT LispData IO LispData
+        listAnalyse lst =
+            lift (atEOF inputStream) >>= \case
+                True  -> throwE END_OF_FILE
+                False -> do
+                    y <- lift $ readChar inputStream
+                    case y of
+                        ')' -> return (LIST lst)
+                        _   -> do
+                            _ <- lift $ unreadChar y inputStream
+                            e <- internalRead' inputStream eofErrorP eofValue recursiveP preserve
+                            listAnalyse (lst ++ [e])
