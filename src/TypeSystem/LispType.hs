@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module TypeSystem.LispType (LispType(..), precedences) where
+module TypeSystem.LispType (LispType(..), precedences, internalTypep) where
 
 data LispType = NIL
               | BOOLEAN
@@ -67,6 +67,7 @@ data LispType = NIL
               | STRING_STREAM
               | SYNONYM_STREAM
               | TWO_WAY_STREAM
+              deriving Eq
 
 precedences :: LispType -> [LispType]
 precedences = \case
@@ -135,3 +136,9 @@ precedences = \case
     STRING_STREAM             -> [STRING_STREAM, STREAM, T]
     SYNONYM_STREAM            -> [SYNONYM_STREAM, STREAM, T]
     TWO_WAY_STREAM            -> [TWO_WAY_STREAM, STREAM, T]
+
+internalTypep :: LispType -> LispType -> Bool
+internalTypep NIL _ = False
+internalTypep _ NIL = False
+internalTypep _ T   = True
+internalTypep t1 t2 = t2 `elem` precedences t1
