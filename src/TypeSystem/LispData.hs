@@ -11,7 +11,19 @@ data LispData = NIL
               | END_OF_FILE
               | READER_ERROR String
               | LIST [LispData]
-              deriving (Eq, Show)
+              | SYMBOL String
+              deriving Eq
+
+instance Show LispData where
+    show NIL                        = "NIL"
+    show T                          = "T"
+    show (SIMPLE_STRING s)          = "\"" ++ s ++ "\""
+    show (INTEGER z)                = show z
+    show END_OF_FILE                = "End of File!!"
+    show (READER_ERROR e)           = "Reader Error!! " ++ e
+    show (LIST [SYMBOL "QUOTE", x]) = '\'' : show x
+    show (LIST xs)                  = "(" ++ unwords (map show xs) ++ ")"
+    show (SYMBOL s)                 = s
 
 internalTypeOf :: LispData -> LispType
 internalTypeOf = \case
@@ -22,3 +34,4 @@ internalTypeOf = \case
     END_OF_FILE       -> END_OF_FILE'
     (READER_ERROR _)  -> READER_ERROR'
     (LIST _)          -> LIST'
+    (SYMBOL _)        -> SYMBOL'

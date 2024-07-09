@@ -111,7 +111,7 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
         assignMacroAnalyser = \case
             '('  -> listAnalyse []
             ')'  -> throwE (READER_ERROR "UNEXPECTED ')'")
-            '\'' -> return (SIMPLE_STRING "QUOTE")
+            '\'' -> expandQuote
             ';'  -> return (SIMPLE_STRING "COMMENT")
             '"'  -> return (SIMPLE_STRING "STRING")
             '`'  -> return (SIMPLE_STRING "STRUCTURE")
@@ -173,5 +173,10 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
                         ')' -> return (LIST lst)
                         _   -> do
                             _ <- lift $ unreadChar y inputStream
-                            e <- internalRead' inputStream eofErrorP eofValue recursiveP preserve
+                            e <- internalRead' inputStream True NIL True preserve
                             listAnalyse (lst ++ [e])
+        
+        expandQuote :: ExceptT LispData IO LispData
+        expandQuote = do
+            e <- internalRead' inputStream True NIL True preserve
+            return (LIST [SYMBOL "QUOTE", e])
