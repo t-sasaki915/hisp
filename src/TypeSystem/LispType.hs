@@ -100,7 +100,7 @@ data LispType = NIL'
               | PRINT_NOT_READABLE'
               | READTABLE'
               | READER_ERROR'
-              deriving Eq
+              deriving (Eq, Show)
 
 precedences :: LispType -> [LispType]
 precedences = \case

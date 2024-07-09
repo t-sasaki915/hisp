@@ -1,12 +1,16 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Main (main) where
 
-import LispReader.LispReader (read, makeStringInputStream)
+import LispReader.Internal (internalRead)
+import TypeSystem.LispData (LispData(..))
 
 import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.State.Strict (runState)
+import Data.ByteString.Char8 (pack)
 import Data.List (elemIndices)
 import Prelude hiding (read)
 import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
+import System.IO.Streams (fromByteString)
 
 readProgram :: IO String
 readProgram = readProgram' ""
@@ -24,14 +28,16 @@ readProgram = readProgram' ""
 repLoop :: IO ()
 repLoop = do
     src <- readProgram
-    case fst $ runState (runExceptT read) (makeStringInputStream src) of
-        Right str ->
-            putStrLn ("SUCCESS " ++ str) >>
-                repLoop
+    stream <- fromByteString (pack src)
+
+    runExceptT (internalRead stream True NIL False) >>= \case
+        Right dat ->
+            putStrLn ("SUCCESS " ++ show dat)
 
         Left err ->
-            putStrLn ("FAILURE " ++ err) >>
-                repLoop
+            putStrLn ("FAILURE " ++ show err)
+
+    repLoop
 
 main :: IO ()
 main = do

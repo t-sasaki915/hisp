@@ -20,10 +20,9 @@ source-repository head
 
 library
   exposed-modules:
-      LispReader.LispReader
+      LispReader.Internal
       TypeSystem.LispData
       TypeSystem.LispType
-      Util
   other-modules:
       Paths_hisp
   hs-source-dirs:
@@ -34,6 +33,7 @@ library
     , regex-posix ==0.96.0.1
     , transformers ==0.6.1.0
     , io-streams ==1.5.2.2
+    , bytestring ==0.11.5.3
   default-language: Haskell2010
 
 executable hisp-exe
@@ -49,6 +49,7 @@ executable hisp-exe
     , regex-posix ==0.96.0.1
     , transformers ==0.6.1.0
     , io-streams ==1.5.2.2
+    , bytestring ==0.11.5.3
   default-language: Haskell2010
 
 test-suite hisp-test
@@ -65,4 +66,5 @@ test-suite hisp-test
     , regex-posix ==0.96.0.1
     , transformers ==0.6.1.0
     , io-streams ==1.5.2.2
+    , bytestring ==0.11.5.3
   default-language: Haskell2010
