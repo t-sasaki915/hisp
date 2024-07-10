@@ -113,7 +113,7 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
             ')'  -> throwE (READER_ERROR "UNEXPECTED ')'")
             '\'' -> expandQuote
             ';'  -> commentAnalyse
-            '"'  -> return (SIMPLE_STRING "STRING")
+            '"'  -> stringAnalyse ""
             '`'  -> return (SIMPLE_STRING "STRUCTURE")
             ','  -> throwE (READER_ERROR "UNEXPECTED ','")
             '#'  -> return (SIMPLE_STRING "DISPATCHING")
@@ -210,3 +210,19 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
                     lift (readChar inputStream) >>= \case
                         '\n' -> internalRead' inputStream eofErrorP eofValue recursiveP preserve
                         _    -> commentAnalyse
+
+        stringAnalyse :: String -> ExceptT LispData IO LispData
+        stringAnalyse buffer = do
+            lift (atEOF inputStream) >>= \case
+                True  -> throwE END_OF_FILE
+                False -> do
+                    y <- lift $ readChar inputStream
+                    case y of
+                        '"'  -> return (SIMPLE_STRING buffer)
+                        '\\' ->
+                            lift (atEOF inputStream) >>= \case
+                                True  -> throwE END_OF_FILE
+                                False -> do
+                                    z <- lift $ readChar inputStream
+                                    stringAnalyse (buffer ++ [z])
+                        _    -> stringAnalyse (buffer ++ [y])
