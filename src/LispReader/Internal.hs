@@ -112,7 +112,7 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
             '('  -> listAnalyse []
             ')'  -> throwE (READER_ERROR "UNEXPECTED ')'")
             '\'' -> expandQuote
-            ';'  -> return (SIMPLE_STRING "COMMENT")
+            ';'  -> commentAnalyse
             '"'  -> return (SIMPLE_STRING "STRING")
             '`'  -> return (SIMPLE_STRING "STRUCTURE")
             ','  -> throwE (READER_ERROR "UNEXPECTED ','")
@@ -200,3 +200,13 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
         expandQuote = do
             e <- internalRead' inputStream True NIL True preserve
             return (LIST [SYMBOL "QUOTE", e])
+        
+        commentAnalyse :: ExceptT LispData IO LispData
+        commentAnalyse = do
+            lift (atEOF inputStream) >>= \case
+                True | eofErrorP -> throwE END_OF_FILE
+                True             -> return eofValue
+                False            ->
+                    lift (readChar inputStream) >>= \case
+                        '\n' -> internalRead' inputStream eofErrorP eofValue recursiveP preserve
+                        _    -> commentAnalyse
