@@ -169,12 +169,32 @@ internalRead' inputStream eofErrorP eofValue recursiveP preserve = do
                 True  -> throwE END_OF_FILE
                 False -> do
                     y <- lift $ readChar inputStream
-                    case y of
-                        ')' -> return (LIST lst)
-                        _   -> do
+                    case (y, categoriseType y) of
+                        (_, Whitespace)     -> listAnalyse lst
+                        (')', _)            -> return (LIST lst)
+                        ('.', _) | null lst -> throwE (READER_ERROR "Unexpected '.'")
+                        ('.', _)            -> do
+                            e <- internalRead' inputStream True NIL True preserve
+                            consAnalyse e
+                        (_, _)              -> do
                             _ <- lift $ unreadChar y inputStream
                             e <- internalRead' inputStream True NIL True preserve
                             listAnalyse (lst ++ [e])
+            where
+                makeCons :: [LispData] -> ExceptT LispData IO LispData
+                makeCons (x : [y]) = return (CONS x y)
+                makeCons (x : ys)  = makeCons ys >>= \y -> return (CONS x y)
+                makeCons _         = throwE (READER_ERROR "Illegal behaviour")
+                
+                consAnalyse :: LispData -> ExceptT LispData IO LispData
+                consAnalyse suf =
+                    lift (atEOF inputStream) >>= \case
+                        True  -> throwE END_OF_FILE
+                        False -> do
+                            z <- lift $ readChar inputStream
+                            case z of
+                                ')' -> makeCons (lst ++ [suf])
+                                c   -> throwE (READER_ERROR ("Unexpected '" ++ [c] ++ "'"))
         
         expandQuote :: ExceptT LispData IO LispData
         expandQuote = do

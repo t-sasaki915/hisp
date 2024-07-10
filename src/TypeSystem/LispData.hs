@@ -12,6 +12,7 @@ data LispData = NIL
               | READER_ERROR String
               | LIST [LispData]
               | SYMBOL String
+              | CONS LispData LispData
               deriving Eq
 
 instance Show LispData where
@@ -24,6 +25,7 @@ instance Show LispData where
     show (LIST [SYMBOL "QUOTE", x]) = '\'' : show x
     show (LIST xs)                  = "(" ++ unwords (map show xs) ++ ")"
     show (SYMBOL s)                 = s
+    show (CONS a b)                 = "(" ++ show a ++ " . " ++ show b ++ ")"
 
 internalTypeOf :: LispData -> LispType
 internalTypeOf = \case
@@ -35,3 +37,4 @@ internalTypeOf = \case
     (READER_ERROR _)  -> READER_ERROR'
     (LIST _)          -> LIST'
     (SYMBOL _)        -> SYMBOL'
+    (CONS _ _)        -> CONS'
